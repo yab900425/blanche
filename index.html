@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>笑話扭蛋機</title>
+<style>
+  :root {
+    --pink: #ff8fab;
+    --pink-dark: #e5668a;
+    --yellow: #ffd166;
+    --mint: #7fd8be;
+    --cream: #fff6e9;
+    --ink: #4a3b47;
+    --white: #ffffff;
+    --common: #7fb7e6;
+    --rare: #b58be8;
+    --epic: #ffb02e;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+    background: linear-gradient(180deg, #ffe3ec 0%, var(--cream) 60%);
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 14px 40px;
+  }
+  header { width: 100%; max-width: 520px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  h1 { font-size: 1.5rem; margin: 0; letter-spacing: 1px; }
+  .coins {
+    background: var(--white); border: 3px solid var(--yellow); border-radius: 999px;
+    padding: 6px 14px; font-weight: 700; font-size: 1.05rem; white-space: nowrap;
+  }
+  .coins span { display: inline-block; }
+  .coins.pop span { animation: pop .4s ease; }
+  main { width: 100%; max-width: 520px; }
+  .screen { display: none; animation: fade .25s ease; }
+  .screen.active { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @keyframes pop { 50% { transform: scale(1.5); } }
+
+  /* ---------- 扭蛋機 ---------- */
+  .machine-wrap { display: flex; flex-direction: column; align-items: center; margin: 18px 0 10px; }
+  .machine { position: relative; width: 240px; }
+  .dome {
+    position: relative; width: 220px; height: 190px; margin: 0 auto;
+    border-radius: 110px 110px 18px 18px; border: 5px solid #fff;
+    background: rgba(255,255,255,.55); box-shadow: inset 0 0 0 4px rgba(255,143,171,.25), 0 4px 0 rgba(0,0,0,.05);
+    overflow: hidden;
+  }
+  .ball { position: absolute; width: 46px; height: 46px; border-radius: 50%; border: 3px solid rgba(255,255,255,.9); box-shadow: inset -6px -6px 0 rgba(0,0,0,.08); }
+  .ball::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 3px; background: rgba(255,255,255,.85); }
+  .body {
+    width: 240px; height: 190px; background: var(--pink); border-radius: 18px 18px 26px 26px;
+    border: 5px solid #fff; box-shadow: 0 6px 0 var(--pink-dark); position: relative; margin-top: -6px;
+  }
+  .slot-coin { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); width: 56px; height: 12px; background: #7a2f4a; border-radius: 6px; }
+  .knob {
+    position: absolute; top: 48px; left: 50%; transform: translateX(-50%); width: 84px; height: 84px; border-radius: 50%;
+    background: var(--yellow); border: 5px solid #fff; box-shadow: 0 4px 0 #e0a92f; display: flex; align-items: center; justify-content: center;
+  }
+  .knob::before { content: ""; width: 56px; height: 12px; background: #fff; border-radius: 6px; }
+  .tray {
+    position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); width: 100px; height: 42px;
+    background: #7a2f4a; border-radius: 10px 10px 18px 18px; overflow: hidden;
+  }
+  .drop-ball { position: absolute; left: 50%; top: -60px; width: 40px; height: 40px; margin-left: -20px; border-radius: 50%; background: var(--mint); border: 3px solid #fff; display: none; }
+  .machine.spinning .knob { animation: spin 1.2s ease-in-out; }
+  .machine.spinning { animation: shake .3s linear 4; }
+  .machine.dropping .drop-ball { display: block; animation: fall .8s ease-in forwards; }
+  @keyframes spin { to { transform: translateX(-50%) rotate(720deg); } }
+  @keyframes shake { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+  @keyframes fall { from { top: -60px; } to { top: 8px; } }
+  .coin-fly {
+    position: absolute; top: -34px; left: 50%; margin-left: -16px; width: 32px; height: 32px; border-radius: 50%;
+    background: var(--yellow); border: 3px solid #e0a92f; display: none; z-index: 3; text-align: center; line-height: 26px; font-weight: 800; color: #b97d00;
+  }
+  .machine.coining .coin-fly { display: block; animation: coinin .6s ease-in forwards; }
+  @keyframes coinin { from { top: -40px; opacity: 1; } to { top: 100px; opacity: 0; } }
+
+  .hint { text-align: center; min-height: 1.6em; margin: 6px 0 12px; font-weight: 600; }
+  .btn-row { display: grid; gap: 10px; }
+  button {
+    font: inherit; font-weight: 700; font-size: 1.1rem; border: none; border-radius: 16px; padding: 14px 16px;
+    background: var(--white); color: var(--ink); box-shadow: 0 4px 0 rgba(0,0,0,.12); cursor: pointer; transition: transform .08s, box-shadow .08s;
+  }
+  button:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.12); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--pink); color: #fff; box-shadow: 0 4px 0 var(--pink-dark); font-size: 1.25rem; padding: 16px; }
+  button.mint { background: var(--mint); box-shadow: 0 4px 0 #52b59a; color: #124a3b; }
+  button.yellow { background: var(--yellow); box-shadow: 0 4px 0 #e0a92f; }
+  button.small { font-size: .95rem; padding: 8px 12px; }
+
+  .card { background: var(--white); border-radius: 20px; padding: 16px; margin-bottom: 14px; box-shadow: 0 4px 0 rgba(0,0,0,.06); }
+  .card h2 { margin: 0 0 6px; font-size: 1.25rem; }
+  .card p { margin: 0 0 12px; line-height: 1.6; }
+
+  /* ---------- 挑戰 ---------- */
+  .pad {
+    height: 240px; border-radius: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; font-size: 1.6rem; font-weight: 800; color: #fff; user-select: none; cursor: pointer; padding: 10px;
+    background: #8f8f9e; box-shadow: 0 5px 0 rgba(0,0,0,.15);
+  }
+  .pad.wait { background: #ef6b6b; }
+  .pad.go { background: #3ec97a; }
+  .pad small { font-size: 1rem; font-weight: 600; opacity: .95; margin-top: 8px; }
+  .status { text-align: center; margin: 12px 0; line-height: 1.7; min-height: 3.2em; font-weight: 600; }
+  .big-time { font-size: 3.2rem; font-weight: 800; text-align: center; margin: 10px 0 4px; font-variant-numeric: tabular-nums; }
+  .target { text-align: center; font-size: 1.15rem; font-weight: 700; }
+
+  /* ---------- 彈窗 ---------- */
+  .overlay { position: fixed; inset: 0; background: rgba(74,59,71,.55); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  .overlay.show { display: flex; }
+  .modal { background: var(--cream); border-radius: 24px; padding: 20px; width: 100%; max-width: 460px; max-height: 88vh; overflow: auto; animation: fade .25s ease; }
+  .badge { display: inline-block; color: #fff; padding: 3px 12px; border-radius: 999px; font-weight: 800; font-size: .9rem; }
+  .badge.common { background: var(--common); }
+  .badge.rare { background: var(--rare); }
+  .badge.epic { background: var(--epic); }
+  .joke-title { font-size: 1.35rem; font-weight: 800; margin: 10px 0 8px; }
+  .joke-body { white-space: pre-line; line-height: 1.8; font-size: 1.08rem; background: var(--white); border-radius: 14px; padding: 14px; }
+  input#answerInput { width: 100%; font: inherit; font-size: 1.05rem; padding: 12px 14px; border-radius: 14px; border: 3px solid var(--yellow); margin-top: 12px; background: #fff; color: var(--ink); }
+  input#answerInput:focus { outline: none; border-color: var(--pink); }
+  .joke-body.answer { background: #e6f8f1; border: 2px solid var(--mint); margin-top: 8px; font-weight: 700; }
+  .feedback { font-weight: 800; margin: 12px 0 0; }
+  .tag-new { color: var(--pink-dark); font-weight: 800; margin: 10px 0; }
+  .egg-open { text-align: center; font-size: 4rem; animation: pop .5s ease; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin: 12px 0; }
+  .cell { background: var(--white); border-radius: 14px; padding: 10px 6px; text-align: center; border: 3px solid transparent; cursor: pointer; font-size: .85rem; font-weight: 700; min-height: 78px; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+  .cell.common { border-color: var(--common); }
+  .cell.rare { border-color: var(--rare); }
+  .cell.epic { border-color: var(--epic); }
+  .cell.locked { background: #ece6ef; color: #9a8fa0; border-color: #d9d0de; cursor: default; }
+  .progress { font-weight: 800; }
+  footer { margin-top: 24px; font-size: .8rem; opacity: .7; text-align: center; max-width: 520px; }
+  .bar { height: 12px; background: #eee; border-radius: 99px; overflow: hidden; margin: 6px 0; }
+  .bar > div { height: 100%; background: var(--pink); width: 0; transition: width .4s; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎰 笑話扭蛋機</h1>
+  <div class="coins" id="coinBox">代幣 <span id="coinCount">0</span> 枚</div>
+</header>
+
+<main>
+  <!-- 首頁 -->
+  <section id="home" class="screen active">
+    <div class="machine-wrap">
+      <div class="machine" id="machine">
+        <div class="coin-fly">$</div>
+        <div class="dome" id="dome"></div>
+        <div class="body">
+          <div class="slot-coin"></div>
+          <div class="knob"></div>
+          <div class="tray"><div class="drop-ball" id="dropBall"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="hint" id="homeHint">先去賺代幣，才能轉扭蛋喔！</div>
+    <div class="btn-row">
+      <button class="primary" id="pullBtn">🪙 投幣扭蛋</button>
+      <button class="mint" id="earnBtn">💪 去賺代幣</button>
+      <button class="yellow" id="bookBtn">📖 笑話圖鑑（<span id="bookCount">0</span> / <span class="totalJokes">30</span>）</button>
+    </div>
+  </section>
+
+  <!-- 選擇挑戰 -->
+  <section id="menu" class="screen">
+    <div class="card">
+      <h2>⚡ 反應速度測試</h2>
+      <p>畫面變綠就立刻點！連續 3 回合，平均 500 毫秒以內就過關。太早點會失敗。</p>
+      <button class="mint" id="goReaction">開始挑戰</button>
+    </div>
+    <div class="card">
+      <h2>⏱ 按秒數大賽</h2>
+      <p>系統給你一個目標秒數，計時器只露臉 2 秒就會消失。憑感覺在目標秒數按「停」，誤差 1 秒內就過關。</p>
+      <button class="mint" id="goTiming">開始挑戰</button>
+    </div>
+    <button id="menuBack">← 回扭蛋機</button>
+  </section>
+
+  <!-- 反應速度 -->
+  <section id="reaction" class="screen">
+    <div class="pad" id="reactionPad" role="button" tabindex="0" aria-label="反應速度區域">點一下開始<small>共 3 回合</small></div>
+    <div class="status" id="reactionStatus" aria-live="polite"></div>
+    <div class="btn-row">
+      <button id="reactionRetry" style="display:none">再挑戰一次</button>
+      <button id="reactionBack">← 回挑戰選單</button>
+    </div>
+  </section>
+
+  <!-- 按秒數 -->
+  <section id="timing" class="screen">
+    <div class="card">
+      <div class="target" id="targetText">目標：—— 秒</div>
+      <div class="big-time" id="timeText">0.00</div>
+      <div class="status" id="timingStatus" aria-live="polite">按「開始」後，計時器只會顯示 2 秒喔。</div>
+      <button class="primary" id="timingBtn">開始</button>
+    </div>
+    <div class="btn-row">
+      <button id="timingRetry" style="display:none">再挑戰一次</button>
+      <button id="timingBack">← 回挑戰選單</button>
+    </div>
+  </section>
+</main>
+
+<!-- 笑話彈窗 -->
+<div class="overlay" id="jokeOverlay" role="dialog" aria-modal="true">
+  <div class="modal">
+    <div class="egg-open" id="eggIcon">🥚</div>
+    <div><span class="badge" id="jokeBadge"></span> <span id="jokeNo" style="font-weight:700"></span></div>
+    <div class="joke-title" id="jokeTitle"></div>
+    <div class="joke-body" id="jokeQ"></div>
+    <div id="answerArea">
+      <input id="answerInput" type="text" maxlength="40" placeholder="想一想，輸入你的答案…" autocomplete="off" aria-label="你的答案">
+      <div class="btn-row" style="margin-top:10px">
+        <button class="mint" id="answerSubmit">送出答案</button>
+        <button id="answerSkip">不知道，看答案</button>
+      </div>
+      <div class="status" id="answerHint" style="min-height:1.6em"></div>
+    </div>
+    <div id="revealArea" style="display:none">
+      <div class="feedback" id="feedback"></div>
+      <div class="joke-body answer" id="jokeA"></div>
+    </div>
+    <div class="tag-new" id="jokeNew"></div>
+    <div class="btn-row" id="jokeBtns" style="display:none">
+      <button class="primary" id="jokeAgain">再玩一次</button>
+      <button id="jokeToBook">看圖鑑</button>
+    </div>
+  </div>
+</div>
+
+<!-- 圖鑑彈窗 -->
+<div class="overlay" id="bookOverlay" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h2 style="margin:0 0 4px">📖 笑話圖鑑</h2>
+    <div class="progress">收集進度：<span id="bookProgress"></span></div>
+    <div class="bar"><div id="bookBar"></div></div>
+    <div class="grid" id="bookGrid"></div>
+    <div class="btn-row">
+      <button class="small" id="resetBtn">重置進度</button>
+      <button class="primary" id="bookClose">關閉</button>
+    </div>
+  </div>
+</div>
+
+<footer>本站 30 則諧音梗笑話皆為原創創作。進度存在你的瀏覽器裡（localStorage），清除網站資料就會消失。</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- 笑話資料（共 30 則，全部原創） ---------- */
+  var JOKES = [
+    { r: "common", t: "鴨力不大", q: "為什麼鴨子考試都不緊張？", a: "因為牠覺得「鴨」力不大。", k: ["壓力", "鴨力", "鴨"] },
+    { r: "common", t: "蚊青", q: "為什麼蚊子特別有文化？", a: "因為牠是「蚊」青。", k: ["文青", "蚊青", "文藝"] },
+    { r: "common", t: "蝦扯", q: "為什麼蝦子常常亂講話？", a: "因為牠都在「蝦」扯。", k: ["瞎扯", "蝦扯", "瞎"] },
+    { r: "common", t: "雞會", q: "為什麼雞最適合當業務？", a: "因為牠最會抓住「雞」會。", k: ["機會", "雞會"] },
+    { r: "common", t: "筆比", q: "為什麼鉛筆很愛跟人比較？", a: "因為牠姓「筆」。", k: ["姓筆", "姓比", "筆"] },
+    { r: "common", t: "終點", q: "為什麼時鐘特別在意結果？", a: "因為牠最重視「鐘」點，喔不，是「終」點。", k: ["終點", "鐘點"] },
+    { r: "common", t: "衣心衣意", q: "為什麼衣服最專情？", a: "因為牠總是「衣」心「衣」意。", k: ["一心一意", "衣心衣意"] },
+    { r: "common", t: "很褲", q: "為什麼牛仔褲總是被人稱讚？", a: "因為牠真的很「褲」。", k: ["很酷", "很褲", "酷"] },
+    { r: "common", t: "豬事順利", q: "為什麼豬什麼事都很順利？", a: "因為牠本來就是「豬」事順利。", k: ["諸事順利", "豬事順利", "豬事"] },
+    { r: "common", t: "愛暗生", q: "愛迪生發明燈泡之前，大家都叫他什麼？", a: "「愛暗生」，因為他一直在黑暗中研究。", k: ["愛暗生", "暗"] },
+    { r: "common", t: "企圖心", q: "為什麼企鵝特別有上進心？", a: "因為牠很有「企」圖心。", k: ["企圖", "企"] },
+    { r: "common", t: "愉快", q: "為什麼魚永遠都很開心？", a: "因為牠過得很「魚」快。", k: ["愉快", "魚快", "愉"] },
+    { r: "common", t: "腳踏實地", q: "為什麼餃子做人特別腳踏實地？", a: "因為牠有「餃」。", k: ["餃", "腳"] },
+    { r: "common", t: "登高", q: "為什麼電燈最愛爬山？", a: "因為牠最會「燈」高。", k: ["登高", "燈高", "登"] },
+    { r: "common", t: "散步", q: "為什麼雨傘喜歡去公園？", a: "因為牠想去「傘」步。", k: ["散步", "傘步", "散"] },
+    { r: "common", t: "輸掉的書", q: "為什麼書最怕比賽？", a: "因為牠總是「書」。", k: ["輸", "書"] },
+    { r: "common", t: "邪門的鞋", q: "為什麼鞋子看起來很邪門？", a: "因為牠本來就姓「鞋」。", k: ["邪", "鞋"] },
+    { r: "common", t: "無歸", q: "為什麼烏龜很少回家？", a: "因為牠「烏」歸。", k: ["無歸", "烏歸", "無家"] },
+    { r: "rare", t: "海報", q: "為什麼海豹最會做宣傳？", a: "因為牠就是「海報」。", k: ["海報", "海豹"] },
+    { r: "rare", t: "有章法", q: "為什麼章魚做事特別有條理？", a: "因為牠很有「章」法，而且還有八隻手。", k: ["章法", "章"] },
+    { r: "rare", t: "絲想", q: "為什麼蠶寶寶很有想法？", a: "因為牠滿腦子都是「絲」想。", k: ["思想", "絲想", "思"] },
+    { r: "rare", t: "熊心壯志", q: "為什麼熊最有大志向？", a: "因為牠是「熊」心壯志。", k: ["雄心", "熊心"] },
+    { r: "rare", t: "獅人", q: "為什麼獅子很會寫詩？", a: "因為牠本來就是「獅」人。", k: ["詩人", "獅人", "詩"] },
+    { r: "rare", t: "鵝鵝鵝", q: "為什麼鵝總是在叫？", a: "因為牠「鵝」了，所以才「鵝、鵝、鵝」。", k: ["餓", "鵝"] },
+    { r: "rare", t: "迷糊狐狸", q: "為什麼狐狸總是迷迷糊糊？", a: "因為牠姓「狐」，所以很「狐」塗。", k: ["糊塗", "狐塗", "糊", "狐"] },
+    { r: "rare", t: "螞上就到", q: "為什麼螞蟻講話都很有效率？", a: "因為牠總是說：「螞」上就到。", k: ["馬上", "螞上"] },
+    { r: "epic", t: "蛋定", q: "為什麼扭蛋機從來不生氣？", a: "因為牠很「蛋」定。", k: ["淡定", "蛋定"] },
+    { r: "epic", t: "蛋願如此", q: "你說「我想抽到超稀有」，扭蛋機回你一句四字的話是什麼？", a: "「蛋」願如此。", k: ["但願", "蛋願"] },
+    { r: "epic", t: "蛋生的好日子", q: "恭喜你抽到超稀有！請問今天是什麼樣的好日子？", a: "今天真是個「蛋」生的好日子。", k: ["誕生", "蛋生"] },
+    { r: "epic", t: "一蛋要截圖", q: "抽到隱藏款之後，你「一定」要做什麼？", a: "「一蛋」要截圖給朋友看，不然沒人相信你抽到。", k: ["截圖", "一蛋", "一定"] }
+  ];
+  var RARITY_LABEL = { common: '普通', rare: '稀有', epic: '超稀有' };
+  var STORAGE_KEY = 'jokeGacha.v1';
+  var REACTION_LIMIT = 500;  // 反應速度：平均毫秒數上限
+  var TIMING_TOL = 1;        // 按秒數：允許誤差（秒）
+  var TIMING_SHOW = 2;       // 按秒數：計時器顯示幾秒
+
+  /* ---------- 狀態與儲存 ---------- */
+  var state = { coins: 0, owned: [] };
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        var d = JSON.parse(raw);
+        if (typeof d.coins === 'number' && d.coins >= 0) state.coins = Math.floor(d.coins);
+        if (Array.isArray(d.owned)) state.owned = d.owned.filter(function (i) { return Number.isInteger(i) && i >= 0 && i < JOKES.length; });
+      }
+    } catch (e) { /* 無法讀取就用預設值 */ }
+  }
+  function save() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* 忽略 */ }
+  }
+
+  /* ---------- 小工具 ---------- */
+  function $(id) { return document.getElementById(id); }
+  var screens = ['home', 'menu', 'reaction', 'timing'];
+  function show(id) {
+    stopAllChallenges();
+    screens.forEach(function (s) { $(s).classList.toggle('active', s === id); });
+    if (id === 'home') updateHome();
+  }
+  function updateCoins() {
+    $('coinCount').textContent = state.coins;
+  }
+  function popCoins() {
+    var box = $('coinBox');
+    box.classList.remove('pop');
+    void box.offsetWidth;
+    box.classList.add('pop');
+  }
+  function updateHome() {
+    updateCoins();
+    $('bookCount').textContent = state.owned.length;
+    var has = state.coins > 0;
+    $('pullBtn').disabled = busy || !has;
+    if (!busy) $('homeHint').textContent = has ? '有代幣囉！按「投幣扭蛋」試試手氣。' : '先去賺代幣，才能轉扭蛋喔！';
+  }
+  function addCoin() {
+    state.coins += 1;
+    save();
+    updateCoins();
+    popCoins();
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.totalJokes'), function (el) { el.textContent = JOKES.length; });
+
+  /* ---------- 扭蛋機裝飾球 ---------- */
+  (function buildBalls() {
+    var colors = ['#ff8fab', '#ffd166', '#7fd8be', '#8fc7ff', '#c9a4ff', '#ffb27f'];
+    var pos = [[10,96],[58,110],[108,100],[160,108],[30,56],[82,64],[134,58],[170,70],[56,10],[112,18],[8,20],[160,22]];
+    var dome = $('dome');
+    pos.forEach(function (p, i) {
+      var b = document.createElement('div');
+      b.className = 'ball';
+      b.style.left = p[0] + 'px';
+      b.style.top = (p[1] + 40) + 'px';
+      b.style.background = colors[i % colors.length];
+      dome.appendChild(b);
+    });
+  })();
+
+  /* ---------- 扭蛋 ---------- */
+  var busy = false;
+  var lastJokeIndex = -1;
+
+  function pickJoke() {
+    var roll = Math.random() * 100;
+    var rarity = roll < 70 ? 'common' : (roll < 95 ? 'rare' : 'epic');
+    var pool = [];
+    JOKES.forEach(function (j, i) { if (j.r === rarity) pool.push(i); });
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  function pull() {
+    if (busy || state.coins <= 0) return;
+    busy = true;
+    state.coins -= 1;
+    var idx = pickJoke();
+    var isNew = state.owned.indexOf(idx) === -1;
+    if (isNew) state.owned.push(idx);
+    save();
+    updateCoins();
+    $('pullBtn').disabled = true;
+    $('homeHint').textContent = '轉轉轉……';
+    var m = $('machine');
+    m.classList.add('coining');
+    setTimeout(function () { m.classList.remove('coining'); m.classList.add('spinning'); }, 600);
+    setTimeout(function () { m.classList.remove('spinning'); m.classList.add('dropping'); }, 1900);
+    setTimeout(function () {
+      m.classList.remove('dropping');
+      busy = false;
+      updateHome();
+      showJoke(idx, isNew, true);
+    }, 2900);
+  }
+
+  var cur = { idx: -1, isNew: false, fromPull: false };
+  function showJoke(idx, isNew, fromPull) {
+    var j = JOKES[idx];
+    cur.idx = idx; cur.isNew = isNew; cur.fromPull = fromPull;
+    $('eggIcon').textContent = fromPull ? '🎉' : '📖';
+    var badge = $('jokeBadge');
+    badge.className = 'badge ' + j.r;
+    badge.textContent = RARITY_LABEL[j.r];
+    $('jokeNo').textContent = 'No.' + String(idx + 1).padStart(2, '0');
+    $('jokeTitle').textContent = j.t;
+    $('jokeQ').textContent = '問：' + j.q;
+    $('jokeA').textContent = '答：' + j.a;
+    $('jokeNew').textContent = '';
+    $('feedback').textContent = '';
+    $('answerHint').textContent = '';
+    $('answerInput').value = '';
+    if (fromPull) {
+      $('answerArea').style.display = '';
+      $('revealArea').style.display = 'none';
+      $('jokeBtns').style.display = 'none';
+    } else {
+      $('answerArea').style.display = 'none';
+      $('revealArea').style.display = '';
+      $('jokeBtns').style.display = '';
+      $('jokeAgain').textContent = '關閉';
+      $('jokeToBook').style.display = 'none';
+    }
+    $('jokeOverlay').classList.add('show');
+    if (fromPull) setTimeout(function () { try { $('answerInput').focus(); } catch (e) {} }, 50);
+  }
+  function normalize(t) { return String(t).replace(/[\s，。！？、「」『』,.!?]/g, '').toLowerCase(); }
+  function reveal(mode) {
+    var j = JOKES[cur.idx];
+    var text = normalize($('answerInput').value);
+    if (mode === 'submit' && !text) { $('answerHint').textContent = '先想想看，或按「不知道，看答案」。'; return; }
+    var correct = mode === 'submit' && j.k.some(function (k) { return text.indexOf(normalize(k)) !== -1; });
+    $('answerArea').style.display = 'none';
+    $('revealArea').style.display = '';
+    $('feedback').textContent = mode === 'skip' ? '沒關係，來看答案～' : (correct ? '🎯 答對了！你太會了！' : '差一點點，來看看答案～');
+    $('jokeNew').textContent = cur.isNew ? '✨ 新收集！已加入圖鑑' : '已收集過囉，再接再厲～';
+    $('jokeBtns').style.display = '';
+    $('jokeAgain').textContent = '再玩一次';
+    $('jokeToBook').style.display = '';
+  }
+  function closeJoke() { $('jokeOverlay').classList.remove('show'); }
+
+  /* ---------- 圖鑑 ---------- */
+  function openBook() {
+    var grid = $('bookGrid');
+    grid.innerHTML = '';
+    JOKES.forEach(function (j, i) {
+      var cell = document.createElement('div');
+      var got = state.owned.indexOf(i) !== -1;
+      cell.className = 'cell ' + (got ? j.r : 'locked');
+      var no = document.createElement('div');
+      no.textContent = 'No.' + String(i + 1).padStart(2, '0');
+      var name = document.createElement('div');
+      name.textContent = got ? j.t : '？？？';
+      cell.appendChild(no);
+      cell.appendChild(name);
+      if (got) {
+        cell.addEventListener('click', function () { $('bookOverlay').classList.remove('show'); showJoke(i, false, false); });
+      }
+      grid.appendChild(cell);
+    });
+    $('bookProgress').textContent = state.owned.length + ' / ' + JOKES.length;
+    $('bookBar').style.width = (state.owned.length / JOKES.length * 100) + '%';
+    $('bookOverlay').classList.add('show');
+  }
+
+  /* ---------- 挑戰：反應速度 ---------- */
+  var R = { phase: 'ready', round: 0, times: [], timer: null, startAt: 0, nextTimer: null };
+  function setPad(cls, html) {
+    var pad = $('reactionPad');
+    pad.className = 'pad' + (cls ? ' ' + cls : '');
+    pad.innerHTML = html;
+  }
+  function reactionReset() {
+    clearTimeout(R.timer); clearTimeout(R.nextTimer);
+    R.phase = 'ready'; R.round = 0; R.times = [];
+    setPad('', '點一下開始<small>共 3 回合</small>');
+    $('reactionStatus').textContent = '準備好了嗎？';
+    $('reactionRetry').style.display = 'none';
+  }
+  function reactionNextRound() {
+    R.round += 1;
+    R.phase = 'waiting';
+    setPad('wait', '等一下…<small>第 ' + R.round + ' / 3 回合，變綠才能點</small>');
+    R.timer = setTimeout(function () {
+      R.phase = 'go';
+      R.startAt = performance.now();
+      setPad('go', '現在點！');
+    }, 1000 + Math.random() * 3000);
+  }
+  function reactionPress() {
+    if (R.phase === 'ready') {
+      $('reactionStatus').textContent = '';
+      reactionNextRound();
+    } else if (R.phase === 'waiting') {
+      clearTimeout(R.timer);
+      R.phase = 'failed';
+      setPad('', '太早了！<small>還沒變綠就點了</small>');
+      $('reactionStatus').textContent = '搶跑失敗，這次不算。再試一次吧！';
+      $('reactionRetry').style.display = '';
+    } else if (R.phase === 'go') {
+      var rt = Math.round(performance.now() - R.startAt);
+      R.times.push(rt);
+      R.phase = 'between';
+      setPad('', rt + ' 毫秒<small>第 ' + R.round + ' 回合</small>');
+      if (R.times.length < 3) {
+        R.nextTimer = setTimeout(reactionNextRound, 1000);
+      } else {
+        var avg = Math.round(R.times.reduce(function (a, b) { return a + b; }, 0) / 3);
+        R.phase = 'done';
+        var detail = R.times.join(' / ') + ' 毫秒，平均 ' + avg + ' 毫秒';
+        if (avg <= REACTION_LIMIT) {
+          addCoin();
+          $('reactionStatus').innerHTML = '🎉 過關！' + detail + '<br>獲得 1 枚代幣！';
+        } else {
+          $('reactionStatus').innerHTML = '差一點！' + detail + '<br>要在 ' + REACTION_LIMIT + ' 毫秒以內才算過關。';
+        }
+        $('reactionRetry').style.display = '';
+      }
+    }
+  }
+
+  /* ---------- 挑戰：按秒數大賽 ---------- */
+  var T = { phase: 'ready', target: 5, startAt: 0, iv: null };
+  function timingReset() {
+    clearInterval(T.iv);
+    T.phase = 'ready';
+    T.target = 4 + Math.floor(Math.random() * 5);
+    $('targetText').textContent = '目標：' + T.target + ' 秒';
+    $('timeText').textContent = '0.00';
+    $('timingStatus').textContent = '按「開始」後，計時器會先顯示 ' + TIMING_SHOW + ' 秒再消失喔。';
+    $('timingBtn').textContent = '開始';
+    $('timingBtn').disabled = false;
+    $('timingRetry').style.display = 'none';
+  }
+  function timingPress() {
+    if (T.phase === 'ready') {
+      T.phase = 'running';
+      T.startAt = performance.now();
+      $('timingBtn').textContent = '停！';
+      $('timingStatus').textContent = '憑感覺，在 ' + T.target + ' 秒按停！';
+      T.iv = setInterval(function () {
+        var e = (performance.now() - T.startAt) / 1000;
+        $('timeText').textContent = e < TIMING_SHOW ? e.toFixed(2) : '？？？';
+      }, 30);
+    } else if (T.phase === 'running') {
+      var elapsed = (performance.now() - T.startAt) / 1000;
+      clearInterval(T.iv);
+      T.phase = 'done';
+      $('timeText').textContent = elapsed.toFixed(2);
+      var err = elapsed - T.target;
+      var absErr = Math.abs(err);
+      var dir = err > 0 ? '慢了' : '快了';
+      $('timingBtn').disabled = true;
+      if (absErr <= TIMING_TOL) {
+        addCoin();
+        $('timingStatus').innerHTML = '🎉 過關！你按在 ' + elapsed.toFixed(2) + ' 秒，只差 ' + absErr.toFixed(2) + ' 秒。<br>獲得 1 枚代幣！';
+      } else {
+        $('timingStatus').innerHTML = '你按在 ' + elapsed.toFixed(2) + ' 秒，' + dir + ' ' + absErr.toFixed(2) + ' 秒。<br>誤差要在 ' + TIMING_TOL + ' 秒內才算過關。';
+      }
+      $('timingRetry').style.display = '';
+    }
+  }
+  function stopAllChallenges() {
+    clearTimeout(R.timer); clearTimeout(R.nextTimer); clearInterval(T.iv);
+  }
+
+  /* ---------- 事件綁定 ---------- */
+  $('pullBtn').addEventListener('click', pull);
+  $('earnBtn').addEventListener('click', function () { show('menu'); });
+  $('bookBtn').addEventListener('click', openBook);
+  $('menuBack').addEventListener('click', function () { show('home'); });
+  $('goReaction').addEventListener('click', function () { show('reaction'); reactionReset(); });
+  $('goTiming').addEventListener('click', function () { show('timing'); timingReset(); });
+  $('reactionBack').addEventListener('click', function () { show('menu'); });
+  $('timingBack').addEventListener('click', function () { show('menu'); });
+  $('reactionRetry').addEventListener('click', reactionReset);
+  $('timingRetry').addEventListener('click', timingReset);
+  var pad = $('reactionPad');
+  pad.addEventListener('pointerdown', function (e) { e.preventDefault(); reactionPress(); });
+  pad.addEventListener('keydown', function (e) { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); reactionPress(); } });
+  $('timingBtn').addEventListener('click', timingPress);
+  $('jokeAgain').addEventListener('click', closeJoke);
+  $('answerSubmit').addEventListener('click', function () { reveal('submit'); });
+  $('answerSkip').addEventListener('click', function () { reveal('skip'); });
+  $('answerInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); reveal('submit'); } });
+  $('jokeToBook').addEventListener('click', function () { closeJoke(); openBook(); });
+  $('bookClose').addEventListener('click', function () { $('bookOverlay').classList.remove('show'); });
+  $('resetBtn').addEventListener('click', function () {
+    if (window.confirm('確定要重置所有代幣和圖鑑嗎？這個動作無法復原。')) {
+      state.coins = 0; state.owned = []; save();
+      updateHome(); openBook();
+    }
+  });
+  ['jokeOverlay', 'bookOverlay'].forEach(function (id) {
+    $(id).addEventListener('click', function (e) { if (e.target === $(id)) $(id).classList.remove('show'); });
+  });
+
+  load();
+  updateHome();
+})();
+</script>
+</body>
+</html>
